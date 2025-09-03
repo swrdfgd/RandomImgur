@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Random Imgur Image Generator</title>
+  <style>
+    :root{
+      --bg:#0b0f14;
+      --panel:#121824;
+      --panel-2:#0f1520;
+      --on:#00ff6a;
+      --on-soft:#00ff6a33;
+      --text:#e7f1ff;
+      --muted:#9fb3c8;
+      --ring:0 0 0 3px var(--on-soft);
+      --shadow:0 10px 30px rgba(0,0,0,.45);
+      --radius:16px;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      font-family:system-ui,Segoe UI,Roboto,Inter,Arial,sans-serif;
+      color:var(--text);
+      background:
+        radial-gradient(1200px 600px at 10% -10%, #00ff6a14, transparent 45%),
+        radial-gradient(900px 500px at 110% 10%, #00e0ff10, transparent 50%),
+        var(--bg);
+    }
+    .wrap{max-width:900px;margin:0 auto;padding:20px;}
+    header{display:flex;align-items:center;gap:14px;margin-bottom:18px;}
+    .power{
+      width:44px;height:44px;border-radius:50%;
+      display:grid;place-items:center;
+      background:linear-gradient(180deg,#14202c, #0b1420);
+      box-shadow:inset 0 0 0 2px #1e2a39, inset 0 0 12px #000, var(--shadow);
+      position:relative;
+    }
+    .power::before{
+      content:"";
+      width:22px;height:22px;border:3px solid var(--on);
+      border-top-color:transparent;border-radius:50%;
+      filter:drop-shadow(0 0 8px var(--on));
+    }
+    .power::after{
+      content:"";position:absolute;width:3px;height:14px;background:var(--on);
+      top:8px;left:50%;transform:translateX(-50%);
+      border-radius:2px;
+      box-shadow:0 0 10px var(--on), 0 0 20px var(--on);
+    }
+    h1{font-size:clamp(20px, 2.6vw, 28px);margin:0;font-weight:700;}
+    .panel{background:linear-gradient(180deg,var(--panel),var(--panel-2));border:1px solid #1a2535;border-radius:var(--radius);box-shadow:var(--shadow);padding:16px;}
+    .controls{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:end;}
+    @media(max-width:600px){.controls{grid-template-columns:1fr;}}
+    label{display:block;font-size:.9rem;color:var(--muted);margin-bottom:6px}
+    input[type="number"]{
+      width:100%;padding:12px 14px;border-radius:12px;border:1px solid #1c2a3b;
+      background:#0c141f;color:var(--text);outline:none;
+    }
+    input[type="number"]:focus{box-shadow:var(--ring);}
+    .btn{
+      padding:12px 18px;border:none;border-radius:999px;cursor:pointer;
+      background:linear-gradient(180deg,#00ff6a,#03c95a);color:#062012;
+      font-weight:800;letter-spacing:.2px;
+      box-shadow:0 10px 24px #00ff6a33,inset 0 -2px 0 #089246;
+      transition:transform .06s ease;
+    }
+    .btn:active{transform:translateY(1px)}
+    .btn.secondary{background:transparent;color:var(--text);border:1px solid #213047;box-shadow:none;}
+    .grid{display:grid;gap:14px;margin-top:16px;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));}
+    .card{background:#0d1622;border:1px solid #1a2739;border-radius:14px;overflow:hidden;display:flex;flex-direction:column;}
+    .thumb{aspect-ratio:16/11;background:#0b1420;display:grid;place-items:center;}
+    .thumb img{max-width:100%;max-height:100%;object-fit:contain;display:block}
+    .meta{padding:10px 12px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+    .url{font-size:.82rem;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:75%}
+    .copy{font-size:.85rem;border:none;background:#142133;color:#cfe6ff;padding:8px 10px;border-radius:10px;cursor:pointer;border:1px solid #1e2c40}
+    .copy:active{transform:translateY(1px)}
+    .status{margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+    .spinner{width:16px;height:16px;border-radius:50%;border:3px solid #1f2c3f;border-top-color:var(--on);animation:spin .8s linear infinite;display:inline-block}
+    @keyframes spin{to{transform:rotate(360deg)}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="power"></div>
+      <h1>Random Imgur Image Generator</h1>
+    </header>
+
+    <section class="panel">
+      <div class="controls">
+        <div>
+          <label for="count">Number of images (max 100)</label>
+          <input id="count" type="number" min="1" max="100" value="5" />
+        </div>
+        <button class="btn" id="goBtn">⚡ Generate</button>
+      </div>
+      <div class="status" id="status"></div>
+      <div class="grid" id="grid"></div>
+    </section>
+  </div>
+
+  <script>
+    const EXTENSIONS = ["jpg","png","gif","jpeg"];
+    const ERROR_W = 161, ERROR_H = 81;
+    const grid = document.getElementById('grid');
+    const statusEl = document.getElementById('status');
+    const goBtn = document.getElementById('goBtn');
+
+    function randomId(len){
+      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+      return Array.from({length:len},()=>chars[Math.floor(Math.random()*chars.length)]).join('');
+    }
+    function randomLenId(){ return randomId(5 + Math.floor(Math.random()*3)); }
+    function randomExt(){ return EXTENSIONS[Math.floor(Math.random()*EXTENSIONS.length)]; }
+    function makeURL(){ return `https://i.imgur.com/${randomLenId()}.${randomExt()}`; }
+
+    function loadImage(url){
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => resolve({ ok:true, img, url });
+        img.onerror = () => resolve({ ok:false, url });
+        img.src = url;
+      });
+    }
+
+    async function findValidImg(){
+      while(true){
+        const url = makeURL();
+        const { ok, img } = await loadImage(url);
+        if(!ok) continue;
+        const {naturalWidth:w,naturalHeight:h} = img;
+        if(w===0||h===0) continue;
+        if(w===ERROR_W && h===ERROR_H) continue;
+        return url;
+      }
+    }
+
+    function card(url){
+      const el = document.createElement('article');
+      el.className = 'card';
+      el.innerHTML = `
+        <div class="thumb"><img src="${url}" alt="Imgur" loading="lazy"></div>
+        <div class="meta">
+          <div class="url" title="${url}">${url}</div>
+          <button class="copy">Copy</button>
+        </div>`;
+      el.querySelector('.copy').addEventListener('click',async()=>{
+        try{
+          await navigator.clipboard.writeText(url);
+          el.querySelector('.copy').textContent='Copied!';
+          setTimeout(()=>el.querySelector('.copy').textContent='Copy',900);
+        }catch{alert('Copy failed: '+url);}
+      });
+      return el;
+    }
+
+    function setStatus(running,text=''){
+      statusEl.innerHTML = running
+        ? `<span class="spinner"></span><span>${text}</span>`
+        : text;
+    }
+
+    async function generateBatch(){
+      const count = Math.max(1,Math.min(100,parseInt(document.getElementById('count').value||'1',10)));
+      grid.innerHTML='';
+      goBtn.disabled=true; goBtn.classList.add('secondary');
+      setStatus(true,`Searching ${count} images...`);
+      let found=0;
+      for(let i=0;i<count;i++){
+        const url=await findValidImg();
+        grid.appendChild(card(url));
+        found++;
+        setStatus(true,`Found ${found}/${count}`);
+      }
+      setStatus(false,`Done: ${found} valid image(s).`);
+      goBtn.disabled=false; goBtn.classList.remove('secondary');
+    }
+
+    goBtn.addEventListener('click',generateBatch);
+  </script>
+</body>
+</html>
